@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Block Burst</title>
+    <style>
+        :root {
+            --bg: #0f111a;
+            --panel: #1a1c2c;
+            --cell: #292d3e;
+            --gold: #f1c40f;
+            --red: #e74c3c;
+        }
+
+        body {
+            background: var(--bg);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Segoe UI', sans-serif;
+            color: white;
+        }
+
+        /* ANA MENÜ EKRANI */
+        #main-menu {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #main-menu h2 { font-weight: 300; margin-bottom: 0; opacity: 0.8; font-size: 20px; }
+        #main-menu h1 { 
+            font-size: 60px; 
+            color: var(--gold); 
+            margin: 10px 0 30px 0; 
+            text-shadow: 0 5px 15px rgba(241, 196, 15, 0.3);
+            letter-spacing: 2px;
+        }
+
+        .sound-notice {
+            color: #bdc3c7;
+            font-size: 14px;
+            margin-bottom: 25px;
+            font-style: italic;
+            max-width: 280px;
+            line-height: 1.4;
+        }
+
+        .big-btn {
+            padding: 15px 60px;
+            font-size: 24px;
+            font-weight: bold;
+            background: var(--gold);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        .big-btn:active { transform: scale(0.95); }
+
+        /* ÜST PANEL VE MENÜ AYARLARI */
+        #top-bar {
+            position: fixed;
+            top: 20px;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        #score { font-size: 40px; font-weight: 900; color: var(--gold); }
+        #menu-trigger {
+            width: 35px; height: 25px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            cursor: pointer;
+        }
+        #menu-trigger div { width: 100%; height: 4px; background: white; border-radius: 4px; }
+
+        #side-menu {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 1500;
+        }
+        .menu-box {
+            background: var(--panel); padding: 30px; border-radius: 20px;
+            display: flex; flex-direction: column; gap: 15px; width: 250px;
+        }
+        .menu-btn { padding: 12px; font-size: 18px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .btn-reset { background: #34495e; color: white; }
+        .btn-home { background: var(--red); color: white; }
+        .btn-close { background: #95a5a6; color: black; margin-top: 10px; }
+
+        /* OYUN ALANI */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(8, 45px);
+            grid-template-rows: repeat(8, 45px);
+            gap: 4px;
+            background: var(--panel);
+            padding: 10px;
+            border-radius: 12px;
+            margin-top: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .cell { width: 45px; height: 45px; background: var(--cell); border-radius: 5px; }
+        .filled { box-shadow: inset 3px 3px 6px rgba(255,255,255,0.2); }
+        .c1 { background: #3498db; } .c2 { background: #e74c3c; } 
+        .c3 { background: #2ecc71; } .c4 { background: #f1c40f; } 
+        .c5 { background: #9b59b6; } .c6 { background: #e67e22; }
+
+        .preview { background: rgba(255,255,255,0.2) !important; border: 2px solid #fff; box-sizing: border-box; }
+
+        #dock { margin-top: 30px; display: flex; justify-content: space-around; width: 100%; max-width: 400px; }
+        .shape-slot { width: 110px; height: 110px; display: flex; justify-content: center; align-items: center; }
+        .shape-group { display: grid; gap: 2px; cursor: grab; }
+        .dragging { position: fixed; pointer-events: none; z-index: 9999; transform: scale(1.1) translateY(-90px) !important; }
+        .unit { width: 30px; height: 30px; border-radius: 4px; }
+
+        #game-over {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15,17,26,0.95);
+            display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 10000;
+        }
+
+        @keyframes popAnim { 0% { transform: scale(1); filter: brightness(1.5); } 100% { transform: scale(0); opacity: 0; } }
+        .pop-effect { animation: popAnim 0.4s forwards; }
+    </style>
+</head>
+<body>
+
+    <div id="main-menu">
+        <h2>Hoş Geldiniz</h2>
+        <h1>BLOCK BURST</h1>
+        <p class="sound-notice">Oyun seslerini duymak istiyorsanız ses düzeyini yükseltiniz!</p>
+        <button class="big-btn" onclick="startGame()">OYNA</button>
+    </div>
+
+    <div id="top-bar">
+        <div id="score">0</div>
+        <div id="menu-trigger" onclick="toggleMenu()">
+            <div></div><div></div><div></div>
+        </div>
+    </div>
+
+    <div id="side-menu">
+        <div class="menu-box">
+            <h3 style="margin:0; text-align:center; color:var(--gold);">MENÜ</h3>
+            <button class="menu-btn btn-reset" onclick="resetGame()">Sıfırla</button>
+            <button class="menu-btn btn-home" onclick="goHome()">Ana Menü</button>
+            <button class="menu-btn btn-close" onclick="toggleMenu()">Kapat</button>
+        </div>
+    </div>
+
+    <div id="grid"></div>
+    <div id="dock"></div>
+
+    <div id="game-over">
+        <h1 style="color:var(--red); font-size:45px; margin-bottom:10px;">Oyun Bitti!</h1>
+        <p style="font-size:26px; margin-bottom:30px;">Skor: <span id="final-score">0</span></p>
+        <button class="big-btn" onclick="resetGame()">TEKRAR DENE</button>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const dock = document.getElementById('dock');
+        const scoreEl = document.getElementById('score');
+        const sideMenu = document.getElementById('side-menu');
+        const mainMenu = document.getElementById('main-menu');
+        const gameOverScreen = document.getElementById('game-over');
+        
+        let board = Array(8).fill().map(() => Array(8).fill(null));
+        let score = 0;
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            let freq = (type === 'pick') ? 450 : (type === 'place' ? 220 : 550);
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+            
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+        }
+
+        const SHAPES = [
+            { color: 'c1', map: [[1,1],[1,1]] },
+            { color: 'c2', map: [[1,1,1,1]] },
+            { color: 'c3', map: [[1,1,1],[0,1,0]] },
+            { color: 'c4', map: [[1,1,1],[1,0,0]] },
+            { color: 'c5', map: [[1,1,1]] },
+            { color: 'c6', map: [[1,1],[1,0]] }
+        ];
+
+        function startGame() { 
+            // Ses sistemini aktifleştir
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            mainMenu.style.display = 'none'; 
+            resetGame(); 
+        }
+        function goHome() { mainMenu.style.display = 'flex'; toggleMenu(); }
+        function toggleMenu() { sideMenu.style.display = (sideMenu.style.display === 'flex') ? 'none' : 'flex'; }
+
+        function resetGame() {
+            board = Array(8).fill().map(() => Array(8).fill(null));
+            score = 0; scoreEl.innerText = '0';
+            gameOverScreen.style.display = 'none';
+            sideMenu.style.display = 'none';
+            grid.innerHTML = '';
+            for(let r=0; r<8; r++) {
+                for(let c=0; c<8; c++) {
+                    const d = document.createElement('div'); d.className = 'cell'; d.id = `r${r}c${c}`;
+                    grid.appendChild(d);
+                }
+            }
+            spawn();
+        }
+
+        function spawn() {
+            dock.innerHTML = '';
+            for(let i=0; i<3; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'shape-slot';
+                createNewBlock(slot);
+                dock.appendChild(slot);
+            }
+            checkGameOver();
+        }
+
+        function createNewBlock(slot) {
+            const s = SHAPES[Math.floor(Math.random()*SHAPES.length)];
+            const w = document.createElement('div');
+            w.className = 'shape-group';
+            w.dataset.info = JSON.stringify(s);
+            w.style.gridTemplateColumns = `repeat(${s.map[0].length}, 30px)`;
+            s.map.forEach(row => row.forEach(v => {
+                const b = document.createElement('div');
+                if(v) b.className = `unit filled ${s.color}`;
+                else b.style.opacity = '0';
+                w.appendChild(b);
+            }));
+            w.onpointerdown = start;
+            slot.appendChild(w);
+        }
+
+        let active = null, originalSlot = null, offX, offY;
+
+        function start(e) {
+            active = e.currentTarget;
+            originalSlot = active.parentElement;
+            playSound('pick');
+            const r = active.getBoundingClientRect();
+            offX = r.width / 2; offY = r.height / 2;
+            active.classList.add('dragging');
+            document.body.appendChild(active);
+            move(e);
+            document.onpointermove = move;
+            document.onpointerup = stop;
+        }
+
+        function move(e) {
+            if(!active) return;
+            active.style.left = (e.clientX - offX) + 'px';
+            active.style.top = (e.clientY - offY) + 'px';
+            document.querySelectorAll('.cell').forEach(c => c.classList.remove('preview'));
+            const target = getPos(e);
+            if(target) {
+                const info = JSON.parse(active.dataset.info);
+                if(canFit(info.map, target.r, target.c)) {
+                    info.map.forEach((row, i) => row.forEach((v, j) => {
+                        if(v) {
+                            const c = document.getElementById(`r${target.r+i}c${target.c+j}`);
+                            if(c) c.classList.add('preview');
+                        }
+                    }));
+                }
+            }
+        }
+
+        function getPos(e) {
+            const r = grid.getBoundingClientRect();
+            const x = Math.floor((e.clientX - r.left) / 49);
+            const y = Math.floor((e.clientY - 90 - r.top) / 49); 
+            if(x>=0 && x<8 && y>=0 && y<8) return {r:y, c:x};
+            return null;
+        }
+
+        function canFit(m, r, c) {
+            for(let i=0; i<m.length; i++) {
+                for(let j=0; j<m[i].length; j++) {
+                    if(m[i][j]) {
+                        if(r+i > 7 || c+j > 7 || board[r+i][c+j]) return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function stop(e) {
+            document.onpointermove = null;
+            document.onpointerup = null;
+            if(!active) return;
+            const target = getPos(e);
+            const info = JSON.parse(active.dataset.info);
+
+            if(target && canFit(info.map, target.r, target.c)) {
+                playSound('place');
+                info.map.forEach((row, i) => row.forEach((v, j) => {
+                    if(v) {
+                        board[target.r+i][target.c+j] = info.color;
+                        document.getElementById(`r${target.r+i}c${target.c+j}`).className = `cell filled ${info.color}`;
+                    }
+                }));
+                active.remove();
+                if(dock.querySelectorAll('.shape-group').length === 0) spawn();
+                else { check(); checkGameOver(); }
+            } else {
+                active.classList.remove('dragging');
+                active.removeAttribute('style');
+                active.style.gridTemplateColumns = `repeat(${info.map[0].length}, 30px)`;
+                originalSlot.appendChild(active);
+            }
+            active = null;
+        }
+
+        function check() {
+            let rs = [], cs = [];
+            for(let i=0; i<8; i++) {
+                if(board[i].every(x => x)) rs.push(i);
+                let f = true; for(let j=0; j<8; j++) if(!board[j][i]) f = false;
+                if(f) cs.push(i);
+            }
+            if(rs.length || cs.length) {
+                setTimeout(() => playSound('clear'), 100);
+                rs.forEach(r => { for(let c=0; c<8; c++) pop(r,c); board[r].fill(null); });
+                cs.forEach(c => { for(let r=0; r<8; r++) pop(r,c); for(let r=0; r<8; r++) board[r][c] = null; });
+                score += (rs.length + cs.length) * 100;
+                scoreEl.innerText = score;
+            }
+        }
+
+        function pop(r, c) {
+            const el = document.getElementById(`r${r}c${c}`);
+            el.classList.add('pop-effect');
+            setTimeout(() => { el.className = 'cell'; el.classList.remove('pop-effect'); }, 400); 
+        }
+
+        function checkGameOver() {
+            const remaining = document.querySelectorAll('.shape-group');
+            if(remaining.length === 0) return;
+            let possible = false;
+            remaining.forEach(block => {
+                const info = JSON.parse(block.dataset.info);
+                for(let r=0; r<8; r++) {
+                    for(let c=0; c<8; c++) {
+                        if(canFit(info.map, r, c)) possible = true;
+                    }
+                }
+            });
+            if(!possible) {
+                setTimeout(() => {
+                    document.getElementById('final-score').innerText = score;
+                    gameOverScreen.style.display = 'flex';
+                }, 800);
+            }
+        }
+    </script>
+</body>
+</html>
